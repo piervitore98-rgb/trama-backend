@@ -1,8 +1,6 @@
 import express from "express";
 import cors from "cors";
 import pkg from "pg";
-import PDFDocument from "pdfkit";
-import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -52,6 +50,28 @@ async function initializeDatabase() {
 }
 
 initializeDatabase();
+
+function rowToResult(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    submittedAt: row.submitted_at,
+    mainAxes: row.main_axes,
+    supportAxes: row.support_axes,
+    aspirazioni: row.aspirations,
+    invalidated: row.invalidated,
+    flaggedAxes: row.flagged_axes,
+    needsReview: row.needs_review,
+    attentionFailed: row.attention_failed,
+    tooManySkips: row.too_many_skips,
+    skipped: row.skipped,
+    straightLining: row.straightlining,
+    longestRun: row.longest_run,
+    socialDesirability: row.social_desirability,
+  };
+}
 
 app.post("/api/submit", async (req, res) => {
   try {
@@ -111,6 +131,18 @@ app.post("/api/submit", async (req, res) => {
   }
 });
 
+app.get("/api/results", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM quiz_results ORDER BY submitted_at DESC"
+    );
+    res.json(result.rows.map(rowToResult));
+  } catch (error) {
+    console.error("❌ Errore elenco risultati:", error);
+    res.status(500).json({ error: "Errore nel recupero" });
+  }
+});
+
 app.get("/api/results/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -123,26 +155,7 @@ app.get("/api/results/:id", async (req, res) => {
       return res.status(404).json({ error: "Risultato non trovato" });
     }
 
-    const row = result.rows[0];
-    res.json({
-      id: row.id,
-      name: row.name,
-      email: row.email,
-      role: row.role,
-      submittedAt: row.submitted_at,
-      mainAxes: row.main_axes,
-      supportAxes: row.support_axes,
-      aspirations: row.aspirations,
-      invalidated: row.invalidated,
-      flaggedAxes: row.flagged_axes,
-      needsReview: row.needs_review,
-      attentionFailed: row.attention_failed,
-      tooManySkips: row.too_many_skips,
-      skipped: row.skipped,
-      straightLining: row.straightlining,
-      longestRun: row.longest_run,
-      socialDesirability: row.social_desirability,
-    });
+    res.json(rowToResult(result.rows[0]));
   } catch (error) {
     console.error("❌ Errore recupero:", error);
     res.status(500).json({ error: "Errore nel recupero" });
@@ -151,32 +164,86 @@ app.get("/api/results/:id", async (req, res) => {
 
 app.post("/api/download-pdf", async (req, res) => {
   try {
-    const { resultId, mainAxes, supportAxes, aspirations, name, email, role } = req.body;
+    const { resultId } = req.body;
+    if (!resultId) {
+      return res.status(400).json({ error: "resultId obbligatorio" });
+    }
 
-    const doc = new PDFDocument({ margin: 50 });
+    const dbResult = await pool.query(
+      "SELECT * FROM quiz_results WHERE id = $1",
+      [resultId]
+    );
+    if (dbResult.rows.length === 0) {
+      return res.status(404).json({ error: "Risultato non trovato" });
+    }
+    const row = rowToResult(dbResult.rows[0]);
+
+    const { default: PDFDocument } = await import("pdfkit");
 
     const NAVY = "#061931";
-    const GREEN = "#80CC28";
     const INK_SOFT = "#4A5563";
     const LINE = "#CFC9B8";
 
-    doc.fontSize(24).fillColor(NAVY).font("Helvetica-Bold").text("TRAMA Quiz", { align: "left" });
-    doc.fontSize(11).fillColor(INK_SOFT).font("Helvetica").text(`Risultati - ${new Date().toLocaleDateString("it-IT")}`, { align: "left" });
-    doc.moveTo(50, 90).lineTo(550, 90).strokeColor(LINE).stroke();
-ls -la
-git init
-git add .
-git commit -m "Backend TRAMA Quiz"
-git remote add origin https://github.com/piervitore98-rgb/trama-backend.git
-git branch -M main
-git push -u origin main
-echo "web: node server.js" > Procfile
-git add Procfile
-git commit -m "Add Procfile"
-git push
-cat > railway.json << 'EOF'
-{
-  "build": {
-    "builder": "nixpacks"
+    const doc = new PDFDocument({ margin: 50 });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="trama-${resultId}.pdf"`);
+    doc.pipe(res);
+
+    doc.fontSize(24).fillColor(NAVY).font("Helvetica-Bold").text("TRAMA Quiz");
+    doc.fontSize(11).fillColor(INK_SOFT).font("Helvetica").text(
+      `${row.name} · ${row.role || ""} · ${new Date(row.submittedAt).toLocaleDateString("it-IT")}`
+    );
+    doc.moveDown(0.5);
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).strokeColor(LINE).stroke();
+    doc.moveDown();
+
+    if (row.invalidated) {
+      doc.fontSize(13).fillColor("#A6432F").font("Helvetica-Bold").text("Profilo non attendibile");
+      doc.fontSize(10).fillColor(INK_SOFT).font("Helvetica").text(
+        "I controlli sul questionario hanno rilevato incoerenze: il profilo sotto va letto con cautela."
+      );
+      doc.moveDown();
+    }
+
+    doc.fontSize(14).fillColor(NAVY).font("Helvetica-Bold").text("Tratti principali");
+    doc.moveDown(0.3);
+    (row.mainAxes || []).forEach((a) => {
+      doc.fontSize(11).fillColor(INK_SOFT).font("Helvetica").text(`${a.label}: ${a.score}`);
+    });
+
+    doc.moveDown();
+    doc.fontSize(14).fillColor(NAVY).font("Helvetica-Bold").text("Tratti complementari");
+    doc.moveDown(0.3);
+    (row.supportAxes || []).forEach((a) => {
+      doc.fontSize(11).fillColor(INK_SOFT).font("Helvetica").text(`${a.label}: ${a.score}`);
+    });
+
+    const asp = row.aspirazioni || {};
+    doc.moveDown();
+    doc.fontSize(14).fillColor(NAVY).font("Helvetica-Bold").text("Obiettivi e prospettive");
+    doc.moveDown(0.3);
+    doc.fontSize(11).fillColor(INK_SOFT).font("Helvetica");
+    if (asp.visione) doc.text(`Tra 1-3 anni: ${asp.visione}`);
+    if ((asp.rankImportanza || []).length) doc.text(`Priorità: ${asp.rankImportanza.join(", ")}`);
+    if ((asp.motivazioni || []).length) doc.text(`Motivazioni: ${asp.motivazioni.join(", ")}`);
+    if ((asp.bisogni || []).length) doc.text(`Bisogni: ${asp.bisogni.join(", ")}`);
+    if (asp.pesa) doc.text(`Cosa pesa: ${asp.pesa}`);
+    if (asp.migliorerei) doc.text(`Cosa migliorerebbe: ${asp.migliorerei}`);
+
+    doc.end();
+  } catch (error) {
+    console.error("❌ Errore PDF:", error);
+    res.status(500).json({ error: "Errore nella generazione del PDF" });
   }
-}
+});
+
+const distPath = path.join(__dirname, "dist");
+app.use(express.static(distPath));
+app.get(/^(?!\/api).*/, (req, res) => {
+  res.sendFile(path.join(distPath, "index.html"));
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🚀 TRAMA avviato su porta ${PORT}`);
+});
