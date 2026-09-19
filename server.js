@@ -12,7 +12,12 @@ import {
 const INK_SOFT = "#4A5563";
 const LINE = "#CFC9B8";
 const FIELD = "#F5F3EC";
+const PAPER = "#EDEAE1";
+const CANVAS = "#DDD8C9";
+const GREEN = "#80CC28";
+const ACCENT = "#4F8A0B";
 const PAGE_MARGIN = 50;
+const CARD_INSET = 16;
 
 const { Pool } = pkg;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -209,9 +214,29 @@ function ensureSpace(doc, needed) {
   if (doc.y + needed > bottom) doc.addPage();
 }
 
+function drawRegistrationMark(doc, cx, cy, size = 7) {
+  doc.save();
+  doc.opacity(0.35);
+  doc.circle(cx, cy, size).lineWidth(0.8).strokeColor(INK_SOFT).stroke();
+  doc.moveTo(cx, cy - size).lineTo(cx, cy + size).strokeColor(INK_SOFT).lineWidth(0.8).stroke();
+  doc.moveTo(cx - size, cy).lineTo(cx + size, cy).strokeColor(INK_SOFT).lineWidth(0.8).stroke();
+  doc.restore();
+}
+
+function drawPageChrome(doc) {
+  const { width, height } = doc.page;
+  doc.rect(0, 0, width, height).fillColor(CANVAS).fill();
+  doc.roundedRect(CARD_INSET, CARD_INSET, width - CARD_INSET * 2, height - CARD_INSET * 2, 14)
+    .fillColor(PAPER).fill();
+  drawRegistrationMark(doc, CARD_INSET + 14, CARD_INSET + 14);
+  drawRegistrationMark(doc, width - CARD_INSET - 14, CARD_INSET + 14);
+}
+
 function sectionTitle(doc, text) {
   ensureSpace(doc, 30);
-  doc.font("Helvetica-Bold").fontSize(12).fillColor(INK_SOFT).text(text.toUpperCase(), PAGE_MARGIN, doc.y, { characterSpacing: 0.3 });
+  const y = doc.y;
+  doc.roundedRect(PAGE_MARGIN, y + 2.5, 6, 6, 1.5).fillColor(ACCENT).fill();
+  doc.font("Helvetica-Bold").fontSize(12).fillColor(INK_SOFT).text(text.toUpperCase(), PAGE_MARGIN + 12, y, { characterSpacing: 0.3 });
   doc.moveDown(0.5);
 }
 
@@ -222,6 +247,8 @@ function drawDivider(doc) {
 
 function drawHeader(doc, row) {
   doc.font("Times-Bold").fontSize(26).fillColor(NAVY).text("TRAMA", PAGE_MARGIN, PAGE_MARGIN);
+  doc.rect(PAGE_MARGIN + 1, doc.y - 3, 34, 3).fillColor(GREEN).fill();
+  doc.moveDown(0.4);
   doc.font("Helvetica").fontSize(10.5).fillColor(INK_SOFT).text(
     `${row.name}  ·  ${row.role || ""}  ·  ${new Date(row.submittedAt).toLocaleDateString("it-IT")}`
   );
@@ -251,7 +278,7 @@ function drawGroupCards(doc, scoreMap) {
   const groups = ["essere", "fare", "avere"];
   const gap = 12;
   const cardW = (CONTENT_WIDTH - gap * 2) / 3;
-  const cardH = 62;
+  const cardH = 64;
   ensureSpace(doc, cardH + 20);
   const top = doc.y;
   groups.forEach((gk, i) => {
@@ -259,11 +286,11 @@ function drawGroupCards(doc, scoreMap) {
     const score = average(MAIN_TRAITS.filter((t) => t.group === gk).map((t) => scoreMap[t.key]));
     const display = toDisplay(score);
     const x = PAGE_MARGIN + i * (cardW + gap);
-    doc.rect(x, top, cardW, cardH).fillColor(FIELD).fill();
-    doc.rect(x, top, 4, cardH).fillColor(meta.color).fill();
-    doc.font("Helvetica-Bold").fontSize(9).fillColor(meta.color).text(meta.label, x + 14, top + 10, { characterSpacing: 0.5 });
-    doc.font("Times-Bold").fontSize(22).fillColor(meta.color).text(display === null ? "—" : `${display > 0 ? "+" : ""}${display}`, x + 14, top + 24);
-    doc.font("Helvetica").fontSize(8.5).fillColor(INK_SOFT).text(meta.caption, x + 14, top + 48);
+    doc.roundedRect(x, top, cardW, cardH, 8).fillColor(FIELD).fill();
+    doc.roundedRect(x, top, 5, cardH, 2.5).fillColor(meta.color).fill();
+    doc.font("Helvetica-Bold").fontSize(9).fillColor(meta.color).text(meta.label, x + 16, top + 11, { characterSpacing: 0.5 });
+    doc.font("Times-Bold").fontSize(23).fillColor(meta.color).text(display === null ? "—" : `${display > 0 ? "+" : ""}${display}`, x + 16, top + 25);
+    doc.font("Helvetica").fontSize(8.5).fillColor(INK_SOFT).text(meta.caption, x + 16, top + 50);
   });
   doc.y = top + cardH + 22;
 }
@@ -299,10 +326,10 @@ function drawMainTraits(doc, mainAxes) {
     const bx = x + (colW - barW) / 2;
     doc.font("Helvetica-Bold").fontSize(6.5).fillColor(color);
     if (display >= 0) {
-      doc.rect(bx, baselineY - barLen, barW, barLen).fillColor(color).fill();
+      doc.roundedRect(bx, baselineY - barLen, barW, barLen, 2).fillColor(color).fill();
       doc.text(`${display > 0 ? "+" : ""}${display}`, x, Math.max(top + labelH, baselineY - barLen - 9), { width: colW, align: "center" });
     } else {
-      doc.rect(bx, baselineY, barW, barLen).fillColor(color).fill();
+      doc.roundedRect(bx, baselineY, barW, barLen, 2).fillColor(color).fill();
       doc.text(`${display}`, x, baselineY + barLen + 2, { width: colW, align: "center" });
     }
   });
@@ -429,6 +456,9 @@ app.post("/api/download-pdf", async (req, res) => {
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="trama-${resultId}.pdf"`);
     doc.pipe(res);
+
+    doc.on("pageAdded", () => drawPageChrome(doc));
+    drawPageChrome(doc);
 
     renderResultPdf(doc, row);
 
