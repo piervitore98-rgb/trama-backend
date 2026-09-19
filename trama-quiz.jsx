@@ -60,7 +60,7 @@ const QUESTION_BANK = [
 
   /* ---- Gestione Pressioni: alto = tiene dentro, basso = esplode ---- */
   L("gestione_pressioni", "Quando qualcosa mi dà fastidio al lavoro, preferisco tenermelo per me."),
-  L("gestione_pressioni", "Quando qualcosa va storto, me ne accorgono tutti dal tono di voce.", -1),
+  L("gestione_pressioni", "Quando qualcosa va storto, se ne accorgono tutti dal tono di voce.", -1),
   B("gestione_pressioni", "C'è una conversazione che stai rimandando da più di due settimane?"),
   B("gestione_pressioni", "C'è qualcuno con cui hai smesso di dire quello che pensi, per quieto vivere?"),
   B("gestione_pressioni", "Ti è mai capitato di parlare di qualcuno alle sue spalle invece che direttamente con lui?"),
