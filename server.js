@@ -452,9 +452,10 @@ app.post("/api/download-pdf", async (req, res) => {
 
     const { default: PDFDocument } = await import("pdfkit");
 
+    const nameSlug = (row.name || "").trim().replace(/\s+/g, "-").replace(/[^\p{L}\p{N}-]+/gu, "") || "risultato";
     const doc = new PDFDocument({ margin: PAGE_MARGIN, size: "A4" });
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="trama-${resultId}.pdf"`);
+    res.setHeader("Content-Disposition", `attachment; filename="Trama-${nameSlug}.pdf"`);
     doc.pipe(res);
 
     doc.on("pageAdded", () => drawPageChrome(doc));

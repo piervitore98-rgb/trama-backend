@@ -280,6 +280,10 @@ const TOTAL_QUESTIONS = QUESTION_BANK.length + ATTENTION_ITEMS.length + TAIL_QUE
 /* ---------------------------------------------------------------------- */
 /* Helpers                                                                  */
 /* ---------------------------------------------------------------------- */
+function pdfFileName(name) {
+  const slug = (name || "").trim().replace(/\s+/g, "-").replace(/[^\p{L}\p{N}-]+/gu, "");
+  return `Trama-${slug || "risultato"}.pdf`;
+}
 function weightedAvg(list) {
   if (!list || !list.length) return null;
   const num = list.reduce((s, x) => s + x.v * x.w, 0);
@@ -680,7 +684,7 @@ export default function TramaQuiz() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `trama-${resultId}.pdf`;
+      a.download = pdfFileName(name);
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (e) { /* il pulsante resta disponibile, l'utente può riprovare */ }
@@ -1135,7 +1139,7 @@ function AdminPanel({ onClose }) {
   }
   React.useEffect(() => { if (adminToken) load(); }, [adminToken]);
 
-  async function downloadPdf(resultId) {
+  async function downloadPdf(resultId, name) {
     try {
       const res = await fetch("/api/download-pdf", {
         method: "POST",
@@ -1147,7 +1151,7 @@ function AdminPanel({ onClose }) {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `trama-${resultId}.pdf`;
+      a.download = pdfFileName(name);
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (e) { /* l'admin può riprovare dal pulsante */ }
@@ -1284,7 +1288,7 @@ function AdminPanel({ onClose }) {
                           {d.aspirazioni.pesa && <div><b>Cosa pesa:</b> {d.aspirazioni.pesa}</div>}
                           {d.aspirazioni.migliorerei && <div><b>Migliorerebbe:</b> {d.aspirazioni.migliorerei}</div>}
                         </div>
-                        <button onClick={() => downloadPdf(d.id)} style={{ marginTop: 16, background: INK, color: PAPER, border: "none", borderRadius: 9999, padding: "9px 18px", fontSize: 12.5, cursor: "pointer" }}>
+                        <button onClick={() => downloadPdf(d.id, d.name)} style={{ marginTop: 16, background: INK, color: PAPER, border: "none", borderRadius: 9999, padding: "9px 18px", fontSize: 12.5, cursor: "pointer" }}>
                           Scarica PDF
                         </button>
                       </div>
