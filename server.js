@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import pkg from "pg";
 import path from "path";
+import crypto from "crypto";
 import { fileURLToPath } from "url";
 
 const { Pool } = pkg;
@@ -10,6 +11,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const adminSessions = new Set();
+
+function getBearerToken(req) {
+  const header = req.headers.authorization || "";
+  const [scheme, token] = header.split(" ");
+  return scheme === "Bearer" && token ? token : null;
+}
+
+function requireAdmin(req, res, next) {
+  const token = getBearerToken(req);
+  if (!token || !adminSessions.has(token)) {
+    return res.status(401).json({ error: "Accesso non autorizzato" });
+  }
+  next();
+}
 
 const pool = new Pool({
   host: process.env.PGHOST,
@@ -131,7 +148,20 @@ app.post("/api/submit", async (req, res) => {
   }
 });
 
-app.get("/api/results", async (req, res) => {
+app.post("/api/admin/login", (req, res) => {
+  const { password } = req.body;
+  if (!process.env.ADMIN_PASSWORD) {
+    return res.status(500).json({ error: "Area titolare non configurata" });
+  }
+  if (password !== process.env.ADMIN_PASSWORD) {
+    return res.status(401).json({ error: "Password non corretta" });
+  }
+  const token = crypto.randomBytes(32).toString("hex");
+  adminSessions.add(token);
+  res.json({ token });
+});
+
+app.get("/api/results", requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
       "SELECT * FROM quiz_results ORDER BY submitted_at DESC"
@@ -143,7 +173,7 @@ app.get("/api/results", async (req, res) => {
   }
 });
 
-app.get("/api/results/:id", async (req, res) => {
+app.get("/api/results/:id", requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
@@ -177,6 +207,11 @@ app.post("/api/download-pdf", async (req, res) => {
       return res.status(404).json({ error: "Risultato non trovato" });
     }
     const row = rowToResult(dbResult.rows[0]);
+
+    const isAdmin = adminSessions.has(getBearerToken(req));
+    if (row.invalidated && !isAdmin) {
+      return res.status(403).json({ error: "Profilo non attendibile: PDF non disponibile" });
+    }
 
     const { default: PDFDocument } = await import("pdfkit");
 

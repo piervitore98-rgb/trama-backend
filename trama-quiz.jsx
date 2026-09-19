@@ -1229,18 +1229,33 @@ function ResultScreen({ name, role, results, tailAnswers, saveState, resultId, o
 /* Area titolare                                                            */
 /* ---------------------------------------------------------------------- */
 function AdminPanel({ onClose }) {
-  const [pin, setPin] = useState("");
-  const [unlocked, setUnlocked] = useState(false);
+  const [password, setPassword] = useState("");
+  const [adminToken, setAdminToken] = useState(null);
+  const [checkingLogin, setCheckingLogin] = useState(false);
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState([]);
   const [error, setError] = useState("");
   const [openKey, setOpenKey] = useState(null);
-  const ADMIN_PIN = "2026";
+
+  async function login() {
+    setCheckingLogin(true); setError("");
+    try {
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+      if (res.ok && data.token) setAdminToken(data.token);
+      else setError(data.error || "Password non corretta.");
+    } catch (e) { setError("Non sono riuscito a contattare il server."); }
+    finally { setCheckingLogin(false); }
+  }
 
   async function load() {
     setLoading(true); setError("");
     try {
-      const res = await fetch("/api/results");
+      const res = await fetch("/api/results", { headers: { Authorization: `Bearer ${adminToken}` } });
       if (!res.ok) throw new Error("errore risposta");
       const list = await res.json();
       const items = list.map((data) => ({ key: data.id, data }));
@@ -1249,7 +1264,25 @@ function AdminPanel({ onClose }) {
     } catch (e) { setError("Non sono riuscito a leggere le risposte salvate."); }
     finally { setLoading(false); }
   }
-  React.useEffect(() => { if (unlocked) load(); }, [unlocked]);
+  React.useEffect(() => { if (adminToken) load(); }, [adminToken]);
+
+  async function downloadPdf(resultId) {
+    try {
+      const res = await fetch("/api/download-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({ resultId }),
+      });
+      if (!res.ok) throw new Error("pdf error");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `trama-${resultId}.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (e) { /* l'admin può riprovare dal pulsante */ }
+  }
 
   const scoreLine = (a) => {
     const d = toDisplay(a.score);
@@ -1267,17 +1300,19 @@ function AdminPanel({ onClose }) {
       <div style={{ background: PAPER, borderRadius: 16, maxWidth: 640, width: "100%", padding: "28px 26px", position: "relative" }}>
         <button onClick={onClose} style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", cursor: "pointer", color: INK_SOFT }}><X size={18} /></button>
 
-        {!unlocked ? (
+        {!adminToken ? (
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
               <Lock size={16} color={INK_SOFT} />
               <div style={{ fontFamily: SERIF, fontSize: 19, fontWeight: 600 }}>Area titolare</div>
             </div>
-            <p style={{ fontSize: 13.5, color: INK_SOFT, marginBottom: 16 }}>Inserisci il codice per vedere le risposte di tutti.</p>
-            <input value={pin} onChange={(e) => setPin(e.target.value)} type="password" placeholder="Codice"
+            <p style={{ fontSize: 13.5, color: INK_SOFT, marginBottom: 16 }}>Inserisci la password per vedere le risposte di tutti.</p>
+            <input value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && login()} type="password" placeholder="Password"
               style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 8, border: `1px solid ${LINE}`, marginBottom: 14, fontSize: 14 }} />
-            <button onClick={() => (pin === ADMIN_PIN ? setUnlocked(true) : setError("Codice non corretto."))}
-              style={{ background: INK, color: PAPER, border: "none", borderRadius: 9999, padding: "10px 20px", fontSize: 14, cursor: "pointer" }}>Entra</button>
+            <button onClick={login} disabled={checkingLogin}
+              style={{ background: INK, color: PAPER, border: "none", borderRadius: 9999, padding: "10px 20px", fontSize: 14, cursor: "pointer", opacity: checkingLogin ? 0.6 : 1 }}>
+              {checkingLogin ? "Verifica…" : "Entra"}
+            </button>
             {error && <div style={{ color: LOW, fontSize: 13, marginTop: 10 }}>{error}</div>}
           </div>
         ) : (
@@ -1380,6 +1415,9 @@ function AdminPanel({ onClose }) {
                           {d.aspirazioni.pesa && <div><b>Cosa pesa:</b> {d.aspirazioni.pesa}</div>}
                           {d.aspirazioni.migliorerei && <div><b>Migliorerebbe:</b> {d.aspirazioni.migliorerei}</div>}
                         </div>
+                        <button onClick={() => downloadPdf(d.id)} style={{ marginTop: 16, background: INK, color: PAPER, border: "none", borderRadius: 9999, padding: "9px 18px", fontSize: 12.5, cursor: "pointer" }}>
+                          Scarica PDF
+                        </button>
                       </div>
                     )}
                   </div>
