@@ -268,38 +268,46 @@ function drawGroupCards(doc, scoreMap) {
   doc.y = top + cardH + 22;
 }
 
-function drawDivergingBar(doc, x, y, width, display, color) {
-  const half = width / 2;
-  const cx = x + half;
-  doc.moveTo(x, y + 5).lineTo(x + width, y + 5).strokeColor(LINE).lineWidth(0.5).dash(2, { space: 2 }).stroke();
-  doc.undash();
-  if (display === null) return;
-  const barLen = Math.max(2, Math.round((Math.abs(display) / 100) * half));
-  if (display >= 0) doc.rect(cx, y, barLen, 8).fillColor(color).fill();
-  else doc.rect(cx - barLen, y, barLen, 8).fillColor(color).fill();
-}
-
 function drawMainTraits(doc, mainAxes) {
   sectionTitle(doc, "Grafico attitudinale (scala -100 / +100)");
-  const rowH = 22;
-  const labelW = 130;
-  const valueW = 40;
-  const barW = CONTENT_WIDTH - labelW - valueW - 10;
-  mainAxes.forEach((a) => {
-    ensureSpace(doc, rowH);
+  const n = mainAxes.length;
+  const gap = 3;
+  const colW = (CONTENT_WIDTH - gap * (n - 1)) / n;
+  const labelH = 20;
+  const half = 44; // altezza massima della barra da un lato della base
+  const blockH = labelH + half * 2 + 14;
+  ensureSpace(doc, blockH + 10);
+  const top = doc.y;
+  const baselineY = top + labelH + half;
+  const barW = Math.min(18, colW * 0.55);
+
+  mainAxes.forEach((a, i) => {
     const trait = TRAIT_BY_KEY[a.key];
     const display = toDisplay(a.score);
     const color = trait ? GROUP_META[trait.group].color : INK_SOFT;
-    const y = doc.y;
-    doc.font("Helvetica").fontSize(9).fillColor("#1a1a1a").text(a.label, PAGE_MARGIN, y + 2, { width: labelW });
-    drawDivergingBar(doc, PAGE_MARGIN + labelW, y, barW, display, color);
-    doc.font("Helvetica-Bold").fontSize(9).fillColor(color).text(
-      display === null ? "—" : `${display > 0 ? "+" : ""}${display}`,
-      PAGE_MARGIN + labelW + barW + 8, y + 2, { width: valueW - 8 }
-    );
-    doc.y = y + rowH;
+    const x = PAGE_MARGIN + i * (colW + gap);
+
+    doc.font("Helvetica-Bold").fontSize(6).fillColor("#1a1a1a")
+      .text(trait ? trait.short : a.label, x, top, { width: colW, align: "center" });
+
+    doc.moveTo(x, baselineY).lineTo(x + colW, baselineY)
+      .strokeColor(LINE).lineWidth(0.5).dash(1.5, { space: 1.5 }).stroke();
+    doc.undash();
+
+    if (display === null) return;
+    const barLen = Math.max(2, Math.round((Math.abs(display) / 100) * half));
+    const bx = x + (colW - barW) / 2;
+    doc.font("Helvetica-Bold").fontSize(6.5).fillColor(color);
+    if (display >= 0) {
+      doc.rect(bx, baselineY - barLen, barW, barLen).fillColor(color).fill();
+      doc.text(`${display > 0 ? "+" : ""}${display}`, x, Math.max(top + labelH, baselineY - barLen - 9), { width: colW, align: "center" });
+    } else {
+      doc.rect(bx, baselineY, barW, barLen).fillColor(color).fill();
+      doc.text(`${display}`, x, baselineY + barLen + 2, { width: colW, align: "center" });
+    }
   });
-  doc.moveDown(0.6);
+  doc.y = top + blockH;
+  doc.moveDown(0.4);
 }
 
 function drawSupportTraits(doc, supportAxes) {
