@@ -618,7 +618,7 @@ export default function TramaQuiz() {
       prev = a;
       if (run > longestRun) longestRun = run;
     });
-    const straightLining = longestRun >= 12;
+    const straightLining = longestRun >= 16;
 
     // 5. Profilo "troppo bello": quasi tutto al massimo favorevole.
     //    Chi risponde come pensa che si debba rispondere finisce sempre qui.
