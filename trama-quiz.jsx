@@ -6,6 +6,7 @@ import {
   ROLES, ROLE_FIT_AXES, ROLE_TAGLINES,
   average, toDisplay, bandVerdict, computeRoleFit,
 } from "./traits.js";
+import agaLogo from "./assets/aga-logo.png";
 
 /* ---------------------------------------------------------------------- */
 /* Palette — colori del marchio Arti Grafiche Alberobello                  */
@@ -320,20 +321,20 @@ function RegistrationMark({ size = 14, color = INK_SOFT, style }) {
     </svg>
   );
 }
-function LogoMark({ size = 34 }) {
+function TramaMark({ size = 40 }) {
+  // piccola trama intrecciata: rappresenta il nome del test, distinta dal logo AGA
+  const step = size / 3.4;
+  const strand = step * 0.52;
+  const cells = [0, 1, 2];
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" aria-label="Arti Grafiche Alberobello">
-      <text x="21" y="30" fontFamily={SERIF} fontSize="30" fontWeight="600" fill={GREEN} textAnchor="middle">G</text>
-      <text x="15" y="30" fontFamily={SERIF} fontSize="30" fontWeight="600" fill={NAVY} textAnchor="middle">A</text>
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
+      {cells.map((r) => (
+        <rect key={`h${r}`} x="0" y={r * step + step / 2 - strand / 2} width={size} height={strand} rx={strand / 3} fill={NAVY} opacity="0.85" />
+      ))}
+      {cells.map((c) => (
+        <rect key={`v${c}`} x={c * step + step / 2 - strand / 2} y="0" width={strand} height={size} rx={strand / 3} fill={GREEN} opacity="0.92" />
+      ))}
     </svg>
-  );
-}
-function Wordmark() {
-  return (
-    <div style={{ lineHeight: 1.15 }}>
-      <div style={{ fontFamily: SERIF, fontSize: 9.5, letterSpacing: 1.6, color: NAVY, fontWeight: 600 }}>ARTI GRAFICHE</div>
-      <div style={{ fontFamily: SERIF, fontSize: 9.5, letterSpacing: 1.6, color: NAVY, fontWeight: 600 }}>ALBEROBELLO</div>
-    </div>
   );
 }
 function WeaveHero() {
@@ -701,21 +702,20 @@ export default function TramaQuiz() {
       `}</style>
 
       <div style={{ maxWidth: 600, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 22, paddingLeft: 4 }}>
-          <LogoMark />
-          <Wordmark />
-          <div style={{ marginLeft: "auto", textAlign: "right" }}>
-            <div style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 19, letterSpacing: 2.5, color: NAVY }}>TRAMA</div>
-            <div style={{ fontFamily: MONO, fontSize: 9.5, color: INK_SOFT, letterSpacing: 0.3 }}>uso interno</div>
-          </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 22, paddingLeft: 4 }}>
+          <img src={agaLogo} alt="Arti Grafiche Alberobello" style={{ height: 58, width: "auto", display: "block" }} />
         </div>
 
         {phase === "intro" && (
           <Card>
-            <div style={{ fontFamily: MONO, fontSize: 11.5, color: ACCENT, letterSpacing: 0.4, marginBottom: 10 }}>test attitudinale · uso interno</div>
-            <h1 style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 29, lineHeight: 1.25, margin: "0 0 18px" }}>
-              Un foglio sembra una superficie liscia.<br />Poi lo guardi controluce.
-            </h1>
+            <div style={{ fontFamily: MONO, fontSize: 11.5, color: ACCENT, letterSpacing: 0.4, marginBottom: 10 }}>test attitudinale</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+              <TramaMark size={36} />
+              <h1 style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 34, letterSpacing: 1, margin: 0, color: NAVY }}>TRAMA</h1>
+            </div>
+            <h2 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: 20, lineHeight: 1.35, margin: "0 0 18px", color: INK_SOFT }}>
+              Un foglio sembra una superficie liscia. Poi lo guardi controluce...
+            </h2>
 
             <WeaveHero />
 
