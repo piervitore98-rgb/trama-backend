@@ -609,10 +609,12 @@ export default function TramaQuiz() {
     const scorable = questions.filter((q) => ["likert", "behav", "logic", "choice"].includes(q.kind)).length;
     const tooManySkips = skipped > scorable * 0.2;
 
-    // 4. Risposte "a macchinetta": stessa identica risposta per una lunga sequenza
+    // 4. Risposte "a macchinetta": stessa identica risposta per una lunga sequenza.
+    //    Una domanda di logica/scelta/controllo in mezzo interrompe la sequenza:
+    //    conta solo la fila che si vede davvero a schermo, non quella "a salti".
     let longestRun = 0, run = 0, prev = null;
     questions.forEach((q) => {
-      if (!["likert", "behav"].includes(q.kind)) return;
+      if (!["likert", "behav"].includes(q.kind)) { run = 0; prev = null; return; }
       const a = answers[q.id];
       if (a !== undefined && a === prev) run++; else run = 1;
       prev = a;
@@ -626,9 +628,13 @@ export default function TramaQuiz() {
     Object.values(polarised).forEach((g) => { allAdjusted.push(...g.pos, ...g.neg); });
     const topShare = allAdjusted.length
       ? allAdjusted.filter((v) => v >= 5).length / allAdjusted.length : 0;
-    const socialDesirability = allAdjusted.length >= 30 && topShare > 0.7;
+    const socialDesirability = allAdjusted.length >= 30 && topShare > 0.78;
 
-    const invalidated = needsReview || attentionFailed || tooManySkips || straightLining || socialDesirability;
+    // Il controllo attenzione da solo basta a invalidare: è inequivocabile.
+    // Gli altri segnali, presi singolarmente, possono capitare anche a chi risponde
+    // onestamente; servono almeno due insieme per invalidare il profilo.
+    const otherFlags = [needsReview, tooManySkips, straightLining, socialDesirability].filter(Boolean).length;
+    const invalidated = attentionFailed || otherFlags >= 2;
     return {
       mainAxes, supportAxes, flaggedAxes, needsReview, attentionFailed, skipped, tooManySkips,
       straightLining, socialDesirability, longestRun, topShare, invalidated,
